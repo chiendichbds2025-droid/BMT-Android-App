@@ -1,99 +1,202 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>BMT Mobile App v1.0</title>
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>BMT Mobile v2.0</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-html,body,#map{height:100%;margin:0}body{font-family:Arial,sans-serif}
-#top{position:fixed;z-index:1000;top:8px;left:8px;right:8px;background:#fff;border-radius:10px;padding:8px;box-shadow:0 2px 10px #666}
-.row{display:flex;gap:6px;flex-wrap:wrap}.row>*{flex:1}.small{font-size:11px;color:#555}
-button,input,select{font-size:14px;padding:8px;border:1px solid #bbb;border-radius:7px;background:#fff}
-#q{flex:3}.pill{display:inline-block;padding:4px 7px;background:#eee;border-radius:999px;font-size:11px;margin-right:4px}
-#panel{display:none;margin-top:6px}.scroll{max-height:34vh;overflow:auto;border-top:1px solid #ddd;margin-top:6px}
-.item{padding:7px 2px;border-bottom:1px solid #eee;font-size:12px}.item b{font-size:13px}
-#gps{position:fixed;right:12px;bottom:18px;z-index:1000;border-radius:50%;width:48px;height:48px;font-size:20px}
-#updateBox{display:none;margin-top:6px;padding-top:6px;border-top:1px solid #ddd}
-</style></head><body><div id="map"></div>
-<div id="top">
- <div class="row"><input id="q" placeholder="Tìm HC cũ, đường, thôn/buôn, nhãn..."><button id="find">Tìm</button><button id="filters">Lọc</button></div>
- <div style="margin-top:5px"><span class="pill" id="count">0 nhãn</span><span class="pill" id="gpsState">GPS: chưa bật</span><span class="pill" id="nearest">Gần nhất: —</span></div>
- <div id="panel">
-   <div class="row"><select id="ward"><option value="">Tất cả phường/xã cũ</option></select><select id="road"><option value="">Tất cả đường</option></select></div>
-   <div class="row"><select id="ham"><option value="">Tất cả thôn/buôn</option></select><button id="reset">Đặt lại</button></div>
-   <div class="row"><button id="showUpdate">Cập nhật dữ liệu</button></div>
-   <div id="updateBox"><input type="file" id="file" accept=".json"><button id="applyUpdate">Nhập / ghi đè update</button><div class="small" id="updateStat"></div></div>
-   <div class="scroll" id="list"></div>
+:root{--blue:#1769e0;--fg:#17202a;--mut:#67727e;--line:#e3e7eb;--card:rgba(255,255,255,.97);--danger:#b42318}
+*{box-sizing:border-box}html,body,#map{height:100%;margin:0}body{font-family:Arial,sans-serif;color:var(--fg);overflow:hidden}
+#map{position:absolute;inset:0;background:#ddd}.leaflet-control-attribution{font-size:8px!important}
+.top{position:fixed;z-index:1200;top:max(7px,env(safe-area-inset-top));left:7px;right:7px}
+.card{background:var(--card);border-radius:14px;box-shadow:0 3px 16px rgba(0,0,0,.22);overflow:hidden}
+.search{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:5px;padding:7px}
+button,input,select,textarea{font:13px Arial;border:1px solid #cbd2d9;background:#fff;border-radius:9px;padding:9px;color:#111}
+button{font-weight:700}button.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+#q{min-width:0}.stats{display:flex;gap:5px;padding:0 7px 7px;overflow-x:auto;white-space:nowrap}
+.pill{padding:4px 7px;background:#f0f2f4;border-radius:999px;font-size:10px}
+#filterPanel{display:none;border-top:1px solid var(--line);padding:7px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}.grid2>*{width:100%}
+.sectionTitle{font-size:11px;font-weight:700;margin:6px 0 4px;color:#4c5661}
+.compact{font-size:11px;padding:7px}.row{display:flex;gap:6px}.row>*{flex:1}
+#sourceBox{display:none;padding-top:5px}.sourceRow{display:flex;align-items:center;gap:6px;font-size:11px;padding:2px 0}
+.bottomBtn{position:fixed;z-index:1200;bottom:max(14px,env(safe-area-inset-bottom));box-shadow:0 3px 14px rgba(0,0,0,.25)}
+#gpsBtn{right:13px;width:53px;height:53px;border-radius:50%;font-size:21px}
+#listBtn{left:13px;border-radius:999px}
+#addBtn{left:50%;transform:translateX(-50%);border-radius:999px}
+.sheet{position:fixed;z-index:1300;left:7px;right:7px;bottom:7px;background:#fff;border-radius:15px;box-shadow:0 4px 24px rgba(0,0,0,.32);display:none;max-height:78vh;overflow:hidden}
+.sheetHead{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--line);font-weight:700;font-size:13px}
+.sheetBody{overflow:auto;max-height:68vh;padding:7px}.item{padding:8px 5px;border-bottom:1px solid var(--line);font-size:11px}.item b{font-size:12px}
+.muted{font-size:10px;color:var(--mut)}.badge{display:inline-block;background:#eef3fb;border-radius:6px;padding:2px 5px;margin-right:3px}
+.formLabel{font-size:10px;color:var(--mut);margin-top:5px}textarea{resize:vertical}
+.marker-label{background:white;border:1px solid #999;border-radius:4px;padding:2px 4px;box-shadow:0 1px 3px #777;font:10px Arial;white-space:nowrap}
+#toast{position:fixed;z-index:2000;left:50%;bottom:82px;transform:translateX(-50%);background:#111;color:#fff;padding:8px 11px;border-radius:9px;display:none;font-size:11px;max-width:90%}
+.warn{color:var(--danger)}
+@media(max-width:420px){button,input,select,textarea{font-size:12px;padding:8px}.top{left:5px;right:5px}.search{padding:6px}.stats{padding:0 6px 6px}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="top">
+ <div class="card">
+  <div class="search">
+   <input id="q" placeholder="Tìm HC cũ, đường, thôn/buôn, nhãn...">
+   <button id="findBtn">Tìm</button>
+   <button id="filterBtn">Lọc</button>
+  </div>
+  <div class="stats">
+   <span class="pill" id="count">0 nhãn</span>
+   <span class="pill" id="gpsState">GPS: tắt</span>
+   <span class="pill" id="nearest">Gần nhất: —</span>
+   <span class="pill" id="dbVersion">DB: seed</span>
+  </div>
+  <div id="filterPanel">
+   <div class="grid2">
+    <select id="ward"><option value="">Tất cả phường/xã cũ</option></select>
+    <select id="road"><option value="">Tất cả đường</option></select>
+    <select id="ham"><option value="">Tất cả thôn/buôn</option></select>
+    <select id="type"><option value="">Nhà + Đất</option><option value="n">Nhà</option><option value="d">Đất</option></select>
+   </div>
+   <div class="sectionTitle">Thông số</div>
+   <div class="grid2">
+    <input id="wmin" inputmode="decimal" placeholder="Ngang từ m">
+    <input id="wmax" inputmode="decimal" placeholder="Ngang đến m">
+    <input id="lmin" inputmode="decimal" placeholder="Dài từ m">
+    <input id="lmax" inputmode="decimal" placeholder="Dài đến m">
+    <input id="tcmin" inputmode="decimal" placeholder="TC từ m²">
+    <input id="tcmax" inputmode="decimal" placeholder="TC đến m²">
+    <input id="pmin" inputmode="decimal" placeholder="Giá từ, vd 1.5tỷ">
+    <input id="pmax" inputmode="decimal" placeholder="Giá đến, vd 3tỷ">
+   </div>
+   <div class="row" style="margin-top:6px"><button id="applyBtn" class="primary">Áp dụng</button><button id="resetBtn">Đặt lại</button></div>
+   <div class="row" style="margin-top:6px"><button id="sourceBtn">Nguồn ▾</button><button id="updateBtn">Cập nhật DB</button></div>
+   <div id="sourceBox"></div>
+  </div>
  </div>
 </div>
-<button id="gps">◎</button>
+
+<button id="listBtn" class="bottomBtn">☰ Danh sách</button>
+<button id="addBtn" class="bottomBtn">＋ Thêm nhãn</button>
+<button id="gpsBtn" class="bottomBtn">◎</button>
+
+<div id="listSheet" class="sheet"><div class="sheetHead"><span>Danh sách lô</span><button data-close="listSheet">Đóng</button></div><div id="listBody" class="sheetBody"></div></div>
+
+<div id="updateSheet" class="sheet">
+ <div class="sheetHead"><span>Cập nhật dữ liệu</span><button data-close="updateSheet">Đóng</button></div>
+ <div class="sheetBody">
+  <div class="muted">Nhập FULL hoặc UPDATE JSON. Cùng ID + cùng tọa độ + nhãn đổi → nhãn mới thành hiện tại, nhãn cũ vào history. ID trùng/nội dung trùng → bỏ qua. ID trùng nhưng tọa độ đổi → REVIEW, không ghi đè tọa độ.</div>
+  <input type="file" id="updateFile" accept=".json" style="width:100%;margin-top:8px">
+  <button id="applyUpdateBtn" class="primary" style="width:100%;margin-top:7px">Nhập / hợp nhất</button>
+  <div id="updateReport" style="margin-top:8px;font-size:11px"></div>
+  <button id="resetSeedBtn" class="warn" style="width:100%;margin-top:10px">Khôi phục dữ liệu gốc 2.291 nhãn</button>
+ </div>
+</div>
+
+<div id="addSheet" class="sheet">
+ <div class="sheetHead"><span>Thêm nhãn / lô đất</span><button data-close="addSheet">Đóng</button></div>
+ <div class="sheetBody">
+  <div class="row"><button id="pickMapBtn">Chọn trên bản đồ</button><button id="useGpsBtn">Dùng GPS hiện tại</button></div>
+  <div class="grid2">
+   <div><div class="formLabel">Vĩ độ</div><input id="alat" inputmode="decimal"></div>
+   <div><div class="formLabel">Kinh độ</div><input id="alng" inputmode="decimal"></div>
+  </div>
+  <button id="reverseBtn" style="width:100%;margin-top:6px">Lấy địa chỉ từ tọa độ</button>
+  <div class="formLabel">Địa chỉ</div><textarea id="aaddress" rows="2"></textarea>
+  <div class="grid2">
+   <div><div class="formLabel">Phường/Xã cũ</div><input id="award"></div>
+   <div><div class="formLabel">Phường/Xã mới</div><input id="anewward"></div>
+   <div><div class="formLabel">Đường</div><input id="aroad"></div>
+   <div><div class="formLabel">Thôn/Buôn</div><input id="aham"></div>
+   <div><div class="formLabel">Ngang (m)</div><input id="aw" inputmode="decimal"></div>
+   <div><div class="formLabel">Dài (m)</div><input id="al" inputmode="decimal"></div>
+   <div><div class="formLabel">Thổ cư (m²)</div><input id="atc" inputmode="decimal"></div>
+   <div><div class="formLabel">Giá (triệu)</div><input id="aprice" inputmode="decimal"></div>
+   <div><div class="formLabel">Hướng</div><input id="adir"></div>
+   <div><div class="formLabel">Nguồn</div><input id="asource"></div>
+  </div>
+  <div class="formLabel">Ghi chú</div><input id="anote">
+  <div class="formLabel">Nhãn hiển thị</div><input id="alabel">
+  <div class="row" style="margin-top:7px"><button id="makeLabelBtn">Tạo nhãn</button><button id="saveLabelBtn" class="primary">Lưu lô</button></div>
+ </div>
+</div>
+
+<div id="toast"></div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="data.js"></script>
 <script>
-const $=id=>document.getElementById(id); let DATA=[],VIEW=[],markers=[],me=null,meMarker=null,watchId=null;
-const map=L.map('map',{zoomControl:true}).setView([12.68,108.04],12);
+'use strict';
+const $=id=>document.getElementById(id);
+const DBKEY='BMT_MOBILE_DB_V2', VERKEY='BMT_MOBILE_DB_VERSION_V2';
+let DATA=[], VIEW=[], layer=L.layerGroup(), me=null, gpsMarker=null, accuracyCircle=null, watchId=null, pickMode=false, labelLayer=L.layerGroup(), sourceState=new Set();
+
+const map=L.map('map',{zoomControl:true,preferCanvas:true}).setView([12.68,108.04],12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap'}).addTo(map);
-function N(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').toLowerCase()}
-function dist(a,b){const R=6371000,p1=a.lat*Math.PI/180,p2=b.lat*Math.PI/180,dp=(b.lat-a.lat)*Math.PI/180,dl=(b.lng-a.lng)*Math.PI/180;const q=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;return 2*R*Math.atan2(Math.sqrt(q),Math.sqrt(1-q))}
+layer.addTo(map);labelLayer.addTo(map);
+
+function toast(t){const e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(toast._t);toast._t=setTimeout(()=>e.style.display='none',2300)}
+function N(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').toLowerCase().trim()}
+function num(v){const n=parseFloat(String(v||'').replace(',','.'));return Number.isFinite(n)?n:null}
+function sameCoord(a,b,t=1e-7){return Math.abs(+a.lat-+b.lat)<t&&Math.abs(+a.lng-+b.lng)<t}
+function dist(a,b){const R=6371000,p1=a.lat*Math.PI/180,p2=b.lat*Math.PI/180,dp=(b.lat-a.lat)*Math.PI/180,dl=(b.lng-a.lng)*Math.PI/180,q=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;return 2*R*Math.atan2(Math.sqrt(q),Math.sqrt(1-q))}
 function fmtD(m){return m<1000?Math.round(m)+' m':(m/1000).toFixed(m<10000?1:0)+' km'}
-function clearMarkers(){markers.forEach(m=>map.removeLayer(m));markers=[]}
-function popup(r){
- let d=me?fmtD(dist(me,{lat:+r.lat,lng:+r.lng})):'—';
- return `<b>${r.label}</b><br>HC cũ: ${r.oldWard||'—'}<br>HC mới: ${r.newWard||'—'}<br>${r.road||r.hamlet||''}<br>Khoảng cách: <b>${d}</b><br>${(+r.lat).toFixed(6)}, ${(+r.lng).toFixed(6)}`
+function cleanLabel(raw){let s=String(raw||'').trim(),code='',m=s.match(/(?:^|[\s\-_])M\s*[:.#-]?\s*(\d{1,10})\s*$/i);if(m){code='M'+m[1];s=s.slice(0,m.index).trim()}s=s.replace(/[–—]+/g,'-').replace(/\s*[-_]{2,}\s*/g,' - ').replace(/\s*-\s*/g,' - ').replace(/(?:\s+-\s+){2,}/g,' - ').replace(/^\s*-\s*|\s*-\s*$/g,'').replace(/^D\.?\s*(\d)/i,'Đ$1').replace(/(\d+(?:[.,]\d+)?)\s*[x×*]\s*(\d+(?:[.,]\d+)?)/i,(x,a,b)=>a.replace(',','.')+'x'+b.replace(',','.')).replace(/\btc\s*:?\s*full\b/ig,'TC Full').replace(/\btc\s*:?\s*(\d+(?:[.,]\d+)?)\b/ig,(x,n)=>'TC'+n.replace(',','.')).replace(/\bg\s*:?\s*(\d+(?:[.,]\d+)?)\b/ig,(x,n)=>'G'+n.replace(',','.')).replace(/\s+/g,' ').trim();return {display:s,code}}
+function parsePriceText(v){let t=N(v).replace(/\s/g,''),m=t.match(/(\d+(?:[.,]\d+)?)(?:ty|ti)/);if(m)return num(m[1])*1e9;m=t.match(/(\d+(?:[.,]\d+)?)(?:tr|trieu)/);if(m)return num(m[1])*1e6;let n=num(v);return n==null?null:(n<100?n*1e9:n*1e6)}
+function recPrice(r){let p=r.parsed?.price;if(p==null)return null;let n=num(p);return n==null?null:n*1e6}
+function recType(r){let s=N(r.label_raw||r.label);return /^n/.test(s)?'n':(/^d|^đ/.test(s)?'d':'')}
+function sourceAllowed(r){return !sourceState.size||sourceState.has(String(r.source||''))}
+function persist(ver){try{localStorage.setItem(DBKEY,JSON.stringify(DATA));if(ver)localStorage.setItem(VERKEY,ver)}catch(e){toast('Bộ nhớ thiết bị đầy; dữ liệu phiên vẫn còn')}}
+function loadDB(){try{let x=localStorage.getItem(DBKEY);DATA=x?JSON.parse(x):(window.BMT_SEED_DATA||[]);if(!Array.isArray(DATA)||!DATA.length)throw 0}catch(e){DATA=window.BMT_SEED_DATA||[];localStorage.removeItem(DBKEY)}$('dbVersion').textContent='DB: '+(localStorage.getItem(VERKEY)||window.BMT_SEED_VERSION||'seed');buildFilters();buildSources();apply()}
+function uniq(a){return [...new Set(a.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'))}
+function opts(el,vals,first){let old=el.value;el.innerHTML='<option value="">'+first+'</option>'+uniq(vals).map(v=>`<option>${String(v).replace(/</g,'&lt;')}</option>`).join('');if([...el.options].some(o=>o.value===old))el.value=old}
+function buildFilters(){opts($('ward'),DATA.map(r=>r.oldWard),'Tất cả phường/xã cũ');cascade()}
+function cascade(){let w=$('ward').value,rows=w?DATA.filter(r=>r.oldWard===w):DATA;opts($('road'),rows.map(r=>r.road),'Tất cả đường');opts($('ham'),rows.map(r=>r.hamlet),'Tất cả thôn/buôn')}
+function buildSources(){let box=$('sourceBox');box.innerHTML='';uniq(DATA.map(r=>r.source)).forEach(s=>{let lab=document.createElement('label');lab.className='sourceRow';lab.innerHTML=`<input type=checkbox checked data-src="${s.replace(/"/g,'&quot;')}"> ${s}`;box.appendChild(lab)});sourceState.clear();box.querySelectorAll('input').forEach(cb=>{sourceState.add(cb.dataset.src);cb.onchange=()=>{cb.checked?sourceState.add(cb.dataset.src):sourceState.delete(cb.dataset.src);apply()}})}
+function matches(r){
+ if(!sourceAllowed(r))return false;
+ const q=N($('q').value),w=$('ward').value,rd=$('road').value,h=$('ham').value,tp=$('type').value;
+ if(w&&r.oldWard!==w)return false;if(rd&&r.road!==rd)return false;if(h&&r.hamlet!==h)return false;if(tp&&recType(r)!==tp)return false;
+ let P=r.parsed||{},rw=num(P.width),rl=num(P.length),rtc=P.residential==='FULL'?999999:num(P.residential),rp=recPrice(r);
+ let mn=num($('wmin').value),mx=num($('wmax').value);if(mn!=null&&(rw==null||rw<mn))return false;if(mx!=null&&(rw==null||rw>mx))return false;
+ mn=num($('lmin').value);mx=num($('lmax').value);if(mn!=null&&(rl==null||rl<mn))return false;if(mx!=null&&(rl==null||rl>mx))return false;
+ mn=num($('tcmin').value);mx=num($('tcmax').value);if(mn!=null&&(rtc==null||rtc<mn))return false;if(mx!=null&&(rtc==null||rtc>mx))return false;
+ mn=parsePriceText($('pmin').value);mx=parsePriceText($('pmax').value);if(mn!=null&&(rp==null||rp<mn))return false;if(mx!=null&&(rp==null||rp>mx))return false;
+ if(q){let fields=[r.oldWard,r.road,r.hamlet,r.label,r.newWard,r.address,r.label_code,r.source].map(N);if(!fields.some(x=>x.includes(q)))return false}
+ return true
 }
-function draw(rows){
- clearMarkers(); VIEW=rows;
- rows.slice(0,3000).forEach(r=>{let m=L.circleMarker([+r.lat,+r.lng],{radius:5,weight:1,fillOpacity:.9}).bindPopup(()=>popup(r));m.on('click',()=>{});m.addTo(map);markers.push(m)});
- $('count').textContent=rows.length+' nhãn';
- renderList(rows);
- updateNearest();
+function rank(r){let q=N($('q').value);if(!q)return 0;return N(r.oldWard).includes(q)?100:N(r.road).includes(q)?80:N(r.hamlet).includes(q)?70:N(r.label).includes(q)?60:N(r.newWard).includes(q)?40:10}
+function apply(){VIEW=DATA.filter(matches);if($('q').value)VIEW.sort((a,b)=>rank(b)-rank(a));if(me)VIEW.sort((a,b)=>dist(me,{lat:+a.lat,lng:+a.lng})-dist(me,{lat:+b.lat,lng:+b.lng}));renderMap();renderList();$('count').textContent=VIEW.length+' / '+DATA.length+' nhãn';updateNearest()}
+function popup(r){let d=me?fmtD(dist(me,{lat:+r.lat,lng:+r.lng})):'—',P=r.parsed||{};return `<b>${r.label}</b><br>HC cũ: ${r.oldWard||'—'}<br>HC mới: ${r.newWard||'—'}<br>${[r.road,r.hamlet].filter(Boolean).join(' • ')}<br>Ngang/Dài: ${P.width??'—'} / ${P.length??'—'} • TC: ${P.residential??'—'}<br><b>Cách bạn: ${d}</b><br><span class=muted>${(+r.lat).toFixed(6)}, ${(+r.lng).toFixed(6)}</span>`}
+function renderMap(){layer.clearLayers();labelLayer.clearLayers();let showText=map.getZoom()>=15;for(const r of VIEW){if(!Number.isFinite(+r.lat)||!Number.isFinite(+r.lng))continue;let m=L.circleMarker([+r.lat,+r.lng],{renderer:L.canvas(),radius:4,weight:1,fillOpacity:.9}).bindPopup(()=>popup(r));m.addTo(layer);if(showText&&VIEW.length<900){L.marker([+r.lat,+r.lng],{interactive:false,icon:L.divIcon({className:'',html:`<div class="marker-label">${String(r.label).replace(/</g,'&lt;')}</div>`,iconAnchor:[-7,8]})}).addTo(labelLayer)}}}
+function renderList(){$('listBody').innerHTML=VIEW.slice(0,400).map(r=>`<div class=item data-id="${r.id}"><b>${r.label}</b><br><span class=badge>${r.oldWard||'HC?'}</span>${r.road?`<span class=badge>${r.road}</span>`:''}${me?`<br>Cách bạn: <b>${fmtD(dist(me,{lat:+r.lat,lng:+r.lng}))}</b>`:''}</div>`).join('');$('listBody').querySelectorAll('.item').forEach(el=>el.onclick=()=>{let r=VIEW.find(x=>String(x.id)===el.dataset.id);if(r){map.setView([+r.lat,+r.lng],17);openSheet(null);setTimeout(()=>{for(const l of layer.getLayers()){if(l.getLatLng&&Math.abs(l.getLatLng().lat-r.lat)<1e-8&&Math.abs(l.getLatLng().lng-r.lng)<1e-8){l.openPopup();break}}},200)}})}
+function updateNearest(){if(!me||!VIEW.length){$('nearest').textContent='Gần nhất: —';return}$('nearest').textContent='Gần nhất: '+fmtD(dist(me,{lat:+VIEW[0].lat,lng:+VIEW[0].lng}))}
+function startGPS(){if(!navigator.geolocation)return toast('Thiết bị không hỗ trợ GPS');if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;$('gpsState').textContent='GPS: tắt';return}watchId=navigator.geolocation.watchPosition(p=>{me={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};if(gpsMarker)map.removeLayer(gpsMarker);if(accuracyCircle)map.removeLayer(accuracyCircle);accuracyCircle=L.circle([me.lat,me.lng],{radius:me.acc,weight:1,fillOpacity:.05}).addTo(map);gpsMarker=L.circleMarker([me.lat,me.lng],{radius:8,weight:3,fillOpacity:1}).addTo(map).bindPopup(`Bạn đang ở đây<br>Độ chính xác ±${Math.round(me.acc)}m`);$('gpsState').textContent='GPS: ±'+Math.round(me.acc)+'m';apply()},e=>{toast('GPS: '+e.message);$('gpsState').textContent='GPS lỗi'},{enableHighAccuracy:true,maximumAge:3000,timeout:15000})}
+function openSheet(id){document.querySelectorAll('.sheet').forEach(x=>x.style.display='none');if(id)$(id).style.display='block'}
+function now(){return new Date().toISOString()}
+function mergeIncoming(inc){
+ let M=new Map(DATA.map(r=>[String(r.id),r])),a={total:0,duplicate:0,new:0,label_changed:0,merged:0,coord_conflict:0,invalid:0};
+ for(let n of inc){a.total++;n={...n};n.id=String(n.id||'').trim();n.label=n.label_display||n.label||'';if(!n.id||!n.label||!Number.isFinite(+n.lat)||!Number.isFinite(+n.lng)){a.invalid++;continue}let o=M.get(n.id);
+  if(!o){let c=cleanLabel(n.label);n.label=c.display;n.label_code=n.label_code||c.code;n.history=n.history||[];M.set(n.id,n);a.new++;continue}
+  if(!sameCoord(o,n)){o.merge_review=o.merge_review||[];o.merge_review.unshift({type:'ID_COORD_CONFLICT',incoming_lat:n.lat,incoming_lng:n.lng,incoming_label:n.label,detected_at:now()});a.coord_conflict++;continue}
+  let nd=cleanLabel(n.label).display,od=cleanLabel(o.label).display;
+  if(N(nd)===N(od)){let changed=false;for(const k of ['address','oldWard','newWard','road','hamlet','source'])if(!o[k]&&n[k]){o[k]=n[k];changed=true}changed?a.merged++:a.duplicate++;continue}
+  o.history=o.history||[];o.history.unshift({label:o.label,label_raw:o.label_raw||o.label,replaced_at:now(),replaced_by:nd,change_type:'LABEL_CHANGED'});o.label=nd;o.label_raw=n.label_raw||n.label;o.updated_at=now();a.label_changed++;
+ }
+ DATA=[...M.values()];persist('update-'+new Date().toLocaleString('vi-VN'));buildFilters();buildSources();apply();return a
 }
-function renderList(rows){
- $('list').innerHTML=rows.slice(0,150).map((r,i)=>`<div class=item data-i="${i}"><b>${r.label}</b><br>${r.oldWard||''}${r.road?' • '+r.road:''}${r.hamlet?' • '+r.hamlet:''}${me?`<br>Cách bạn: ${fmtD(dist(me,{lat:+r.lat,lng:+r.lng}))}`:''}</div>`).join('');
- [...$('list').children].forEach((el,i)=>el.onclick=()=>{let r=rows[i];map.setView([+r.lat,+r.lng],17);markers[i]?.openPopup()});
-}
-function options(sel,vals,first){sel.innerHTML=`<option value="">${first}</option>`+[...new Set(vals.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi')).map(v=>`<option>${v}</option>`).join('')}
-function buildWard(){options($('ward'),DATA.map(r=>r.oldWard),'Tất cả phường/xã cũ');cascade()}
-function cascade(){
- const w=$('ward').value; const rows=w?DATA.filter(r=>r.oldWard===w):DATA;
- options($('road'),rows.map(r=>r.road),'Tất cả đường'); options($('ham'),rows.map(r=>r.hamlet),'Tất cả thôn/buôn')
-}
-function apply(){
- const q=N($('q').value),w=$('ward').value,rd=$('road').value,h=$('ham').value;
- let rows=DATA.filter(r=>(!w||r.oldWard===w)&&(!rd||r.road===rd)&&(!h||r.hamlet===h));
- if(q)rows=rows.map(r=>{let s=N([r.oldWard,r.road,r.hamlet,r.label,r.newWard,r.address].join(' '));let score=N(r.oldWard).includes(q)?100:N(r.road).includes(q)?80:N(r.hamlet).includes(q)?70:N(r.label).includes(q)?60:N(r.newWard).includes(q)?40:s.includes(q)?10:0;return {r,score}}).filter(x=>x.score).sort((a,b)=>b.score-a.score).map(x=>x.r);
- if(me)rows.sort((a,b)=>dist(me,{lat:+a.lat,lng:+a.lng})-dist(me,{lat:+b.lat,lng:+b.lng}));
- draw(rows)
-}
-function updateNearest(){
- if(!me||!VIEW.length){$('nearest').textContent='Gần nhất: —';return}
- let r=VIEW[0],d=dist(me,{lat:+r.lat,lng:+r.lng});$('nearest').textContent='Gần nhất: '+fmtD(d)
-}
-async function loadSeed(){
- let j=await fetch('data.json').then(r=>r.json());
- let local=localStorage.getItem('BMT_MOBILE_DB_V1');
- DATA=local?JSON.parse(local):j.records; buildWard(); draw(DATA)
-}
-function startGPS(){
- if(!navigator.geolocation)return alert('Thiết bị không hỗ trợ GPS');
- if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;$('gpsState').textContent='GPS: tắt';return}
- watchId=navigator.geolocation.watchPosition(p=>{
-   me={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
-   if(meMarker)map.removeLayer(meMarker);
-   meMarker=L.circleMarker([me.lat,me.lng],{radius:8,weight:3,fillOpacity:1}).addTo(map).bindPopup(`Bạn đang ở đây<br>Độ chính xác ~${Math.round(me.acc)} m`);
-   $('gpsState').textContent='GPS: ±'+Math.round(me.acc)+'m'; apply()
- },e=>{$('gpsState').textContent='GPS lỗi';alert(e.message)},{enableHighAccuracy:true,maximumAge:3000,timeout:15000})
-}
-$('gps').onclick=startGPS;$('find').onclick=apply;$('q').addEventListener('keydown',e=>{if(e.key==='Enter')apply()});
-$('filters').onclick=()=>{$('panel').style.display=$('panel').style.display==='block'?'none':'block'};
-$('ward').onchange=()=>{cascade();apply()};$('road').onchange=apply;$('ham').onchange=apply;
-$('reset').onclick=()=>{$('q').value='';$('ward').value='';cascade();apply()};
-$('showUpdate').onclick=()=>{$('updateBox').style.display=$('updateBox').style.display==='block'?'none':'block'};
-$('applyUpdate').onclick=()=>{
- let f=$('file').files[0];if(!f)return alert('Chọn file JSON update');
- let rd=new FileReader;rd.onload=()=>{try{
-   let j=JSON.parse(rd.result), inc=Array.isArray(j)?j:(j.records||[]);
-   const M=new Map(DATA.map(r=>[String(r.id),r]));let n=0,u=0;
-   inc.forEach(r=>{let id=String(r.id||'');if(!id)return;if(M.has(id)){M.set(id,{...M.get(id),...r});u++}else{M.set(id,r);n++}});
-   DATA=[...M.values()];localStorage.setItem('BMT_MOBILE_DB_V1',JSON.stringify(DATA));buildWard();apply();
-   $('updateStat').textContent=`Update xong: +${n} mới, ${u} ghi đè/cập nhật, tổng ${DATA.length}.`;
- }catch(e){alert('File update lỗi: '+e.message)}};rd.readAsText(f,'utf-8')
-};
-loadSeed();
-</script></body></html>
+function makeLabel(){let parts=[];if($('aw').value||$('al').value)parts.push(($('aw').value||'?')+'x'+($('al').value||'?'));if($('atc').value)parts.push('TC'+$('atc').value);if($('adir').value)parts.push($('adir').value);if($('aprice').value)parts.push('G'+$('aprice').value);if($('anote').value)parts.push($('anote').value);$('alabel').value=parts.join(' - ')}
+function saveNew(){let lat=num($('alat').value),lng=num($('alng').value),label=cleanLabel($('alabel').value).display;if(lat==null||lng==null||!label)return toast('Cần tọa độ và nhãn');let r={id:'LOCAL_'+Date.now(),label,label_raw:$('alabel').value,label_code:'',lat,lng,oldWard:$('award').value,newWard:$('anewward').value,road:$('aroad').value,hamlet:$('aham').value,address:$('aaddress').value,source:$('asource').value||'mobile-local',qa:'LOCAL',updated_at:now(),history:[],parsed:{width:num($('aw').value),length:num($('al').value),residential:num($('atc').value),price:$('aprice').value||null,direction:$('adir').value||null}};DATA.push(r);persist('local-'+new Date().toLocaleString('vi-VN'));buildFilters();buildSources();apply();openSheet(null);map.setView([lat,lng],17);toast('Đã lưu lô mới')}
+async function reverse(){let lat=num($('alat').value),lng=num($('alng').value);if(lat==null||lng==null)return toast('Chưa có tọa độ');$('aaddress').value='Đang lấy địa chỉ...';try{let x=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=vi`),j=await x.json(),a=j.address||{};$('aaddress').value=j.display_name||'';$('aroad').value=a.road||a.pedestrian||a.residential||'';$('aham').value=a.hamlet||a.village||a.suburb||''}catch(e){$('aaddress').value='Không lấy được địa chỉ online; tọa độ vẫn được giữ.'}}
+map.on('zoomend',()=>renderMap());map.on('click',e=>{if(!pickMode)return;pickMode=false;$('alat').value=e.latlng.lat.toFixed(7);$('alng').value=e.latlng.lng.toFixed(7);openSheet('addSheet');toast('Đã lấy tọa độ')});
+$('findBtn').onclick=apply;$('q').onkeydown=e=>{if(e.key==='Enter')apply()};$('filterBtn').onclick=()=>{$('filterPanel').style.display=$('filterPanel').style.display==='block'?'none':'block'};
+$('ward').onchange=()=>{cascade();apply()};$('road').onchange=apply;$('ham').onchange=apply;$('applyBtn').onclick=apply;$('resetBtn').onclick=()=>{['q','wmin','wmax','lmin','lmax','tcmin','tcmax','pmin','pmax'].forEach(id=>$(id).value='');$('ward').value='';$('type').value='';cascade();apply()};
+$('sourceBtn').onclick=()=>{$('sourceBox').style.display=$('sourceBox').style.display==='block'?'none':'block';$('sourceBtn').textContent=$('sourceBox').style.display==='block'?'Nguồn ▴':'Nguồn ▾'};
+$('updateBtn').onclick=()=>openSheet('updateSheet');$('listBtn').onclick=()=>openSheet('listSheet');$('addBtn').onclick=()=>openSheet('addSheet');$('gpsBtn').onclick=startGPS;
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>openSheet(null));
+$('pickMapBtn').onclick=()=>{pickMode=true;openSheet(null);toast('Bấm đúng vị trí lô đất trên bản đồ')};$('useGpsBtn').onclick=()=>{if(!me)return toast('Bật GPS trước');$('alat').value=me.lat.toFixed(7);$('alng').value=me.lng.toFixed(7)};$('reverseBtn').onclick=reverse;$('makeLabelBtn').onclick=makeLabel;$('saveLabelBtn').onclick=saveNew;
+$('applyUpdateBtn').onclick=()=>{let f=$('updateFile').files[0];if(!f)return toast('Chọn file JSON');let rd=new FileReader;rd.onload=()=>{try{let j=JSON.parse(rd.result),inc=Array.isArray(j)?j:(j.records||[]),a=mergeIncoming(inc);$('updateReport').innerHTML=`Tổng ${a.total} • Trùng ${a.duplicate} • Mới ${a.new} • Thay nhãn ${a.label_changed} • Hợp nhất ${a.merged} • Xung đột tọa độ ${a.coord_conflict} • Lỗi ${a.invalid}`;toast('Cập nhật xong')}catch(e){toast('File update lỗi')}};rd.readAsText(f,'utf-8')};
+$('resetSeedBtn').onclick=()=>{if(!confirm('Khôi phục dữ liệu seed? Các lô thêm riêng trên điện thoại sẽ mất khỏi DB hiện tại.'))return;localStorage.removeItem(DBKEY);localStorage.removeItem(VERKEY);DATA=JSON.parse(JSON.stringify(window.BMT_SEED_DATA||[]));buildFilters();buildSources();apply();$('dbVersion').textContent='DB: '+window.BMT_SEED_VERSION;toast('Đã khôi phục seed')};
+loadDB();
+</script>
+</body></html>
