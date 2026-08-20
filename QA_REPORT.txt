@@ -1,0 +1,14 @@
+12-ROLE QA — BMT Android v1.0
+PASS 01: Android project structure.
+PASS 02: minSdk 26 / target 35 / compile 35.
+PASS 03: INTERNET permission.
+PASS 04: precise/coarse location permissions.
+PASS 05: WebView geolocation permission bridge.
+PASS 06: file chooser bridge for JSON update.
+PASS 07: localStorage persistence retained.
+PASS 08: seed data 2,291 records.
+PASS 09: Haversine distance logic retained.
+PASS 10: nearest-first ordering retained.
+PASS 11: GitHub Actions Android SDK + Gradle build workflow.
+PASS 12: update architecture separated from APK lifecycle.
+NOTE: APK binary itself requires Android SDK build execution; workflow is included for reproducible CI build.

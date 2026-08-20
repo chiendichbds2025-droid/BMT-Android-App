@@ -1,0 +1,99 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BMT Mobile App v1.0</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+html,body,#map{height:100%;margin:0}body{font-family:Arial,sans-serif}
+#top{position:fixed;z-index:1000;top:8px;left:8px;right:8px;background:#fff;border-radius:10px;padding:8px;box-shadow:0 2px 10px #666}
+.row{display:flex;gap:6px;flex-wrap:wrap}.row>*{flex:1}.small{font-size:11px;color:#555}
+button,input,select{font-size:14px;padding:8px;border:1px solid #bbb;border-radius:7px;background:#fff}
+#q{flex:3}.pill{display:inline-block;padding:4px 7px;background:#eee;border-radius:999px;font-size:11px;margin-right:4px}
+#panel{display:none;margin-top:6px}.scroll{max-height:34vh;overflow:auto;border-top:1px solid #ddd;margin-top:6px}
+.item{padding:7px 2px;border-bottom:1px solid #eee;font-size:12px}.item b{font-size:13px}
+#gps{position:fixed;right:12px;bottom:18px;z-index:1000;border-radius:50%;width:48px;height:48px;font-size:20px}
+#updateBox{display:none;margin-top:6px;padding-top:6px;border-top:1px solid #ddd}
+</style></head><body><div id="map"></div>
+<div id="top">
+ <div class="row"><input id="q" placeholder="Tìm HC cũ, đường, thôn/buôn, nhãn..."><button id="find">Tìm</button><button id="filters">Lọc</button></div>
+ <div style="margin-top:5px"><span class="pill" id="count">0 nhãn</span><span class="pill" id="gpsState">GPS: chưa bật</span><span class="pill" id="nearest">Gần nhất: —</span></div>
+ <div id="panel">
+   <div class="row"><select id="ward"><option value="">Tất cả phường/xã cũ</option></select><select id="road"><option value="">Tất cả đường</option></select></div>
+   <div class="row"><select id="ham"><option value="">Tất cả thôn/buôn</option></select><button id="reset">Đặt lại</button></div>
+   <div class="row"><button id="showUpdate">Cập nhật dữ liệu</button></div>
+   <div id="updateBox"><input type="file" id="file" accept=".json"><button id="applyUpdate">Nhập / ghi đè update</button><div class="small" id="updateStat"></div></div>
+   <div class="scroll" id="list"></div>
+ </div>
+</div>
+<button id="gps">◎</button>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $=id=>document.getElementById(id); let DATA=[],VIEW=[],markers=[],me=null,meMarker=null,watchId=null;
+const map=L.map('map',{zoomControl:true}).setView([12.68,108.04],12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap'}).addTo(map);
+function N(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').toLowerCase()}
+function dist(a,b){const R=6371000,p1=a.lat*Math.PI/180,p2=b.lat*Math.PI/180,dp=(b.lat-a.lat)*Math.PI/180,dl=(b.lng-a.lng)*Math.PI/180;const q=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;return 2*R*Math.atan2(Math.sqrt(q),Math.sqrt(1-q))}
+function fmtD(m){return m<1000?Math.round(m)+' m':(m/1000).toFixed(m<10000?1:0)+' km'}
+function clearMarkers(){markers.forEach(m=>map.removeLayer(m));markers=[]}
+function popup(r){
+ let d=me?fmtD(dist(me,{lat:+r.lat,lng:+r.lng})):'—';
+ return `<b>${r.label}</b><br>HC cũ: ${r.oldWard||'—'}<br>HC mới: ${r.newWard||'—'}<br>${r.road||r.hamlet||''}<br>Khoảng cách: <b>${d}</b><br>${(+r.lat).toFixed(6)}, ${(+r.lng).toFixed(6)}`
+}
+function draw(rows){
+ clearMarkers(); VIEW=rows;
+ rows.slice(0,3000).forEach(r=>{let m=L.circleMarker([+r.lat,+r.lng],{radius:5,weight:1,fillOpacity:.9}).bindPopup(()=>popup(r));m.on('click',()=>{});m.addTo(map);markers.push(m)});
+ $('count').textContent=rows.length+' nhãn';
+ renderList(rows);
+ updateNearest();
+}
+function renderList(rows){
+ $('list').innerHTML=rows.slice(0,150).map((r,i)=>`<div class=item data-i="${i}"><b>${r.label}</b><br>${r.oldWard||''}${r.road?' • '+r.road:''}${r.hamlet?' • '+r.hamlet:''}${me?`<br>Cách bạn: ${fmtD(dist(me,{lat:+r.lat,lng:+r.lng}))}`:''}</div>`).join('');
+ [...$('list').children].forEach((el,i)=>el.onclick=()=>{let r=rows[i];map.setView([+r.lat,+r.lng],17);markers[i]?.openPopup()});
+}
+function options(sel,vals,first){sel.innerHTML=`<option value="">${first}</option>`+[...new Set(vals.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi')).map(v=>`<option>${v}</option>`).join('')}
+function buildWard(){options($('ward'),DATA.map(r=>r.oldWard),'Tất cả phường/xã cũ');cascade()}
+function cascade(){
+ const w=$('ward').value; const rows=w?DATA.filter(r=>r.oldWard===w):DATA;
+ options($('road'),rows.map(r=>r.road),'Tất cả đường'); options($('ham'),rows.map(r=>r.hamlet),'Tất cả thôn/buôn')
+}
+function apply(){
+ const q=N($('q').value),w=$('ward').value,rd=$('road').value,h=$('ham').value;
+ let rows=DATA.filter(r=>(!w||r.oldWard===w)&&(!rd||r.road===rd)&&(!h||r.hamlet===h));
+ if(q)rows=rows.map(r=>{let s=N([r.oldWard,r.road,r.hamlet,r.label,r.newWard,r.address].join(' '));let score=N(r.oldWard).includes(q)?100:N(r.road).includes(q)?80:N(r.hamlet).includes(q)?70:N(r.label).includes(q)?60:N(r.newWard).includes(q)?40:s.includes(q)?10:0;return {r,score}}).filter(x=>x.score).sort((a,b)=>b.score-a.score).map(x=>x.r);
+ if(me)rows.sort((a,b)=>dist(me,{lat:+a.lat,lng:+a.lng})-dist(me,{lat:+b.lat,lng:+b.lng}));
+ draw(rows)
+}
+function updateNearest(){
+ if(!me||!VIEW.length){$('nearest').textContent='Gần nhất: —';return}
+ let r=VIEW[0],d=dist(me,{lat:+r.lat,lng:+r.lng});$('nearest').textContent='Gần nhất: '+fmtD(d)
+}
+async function loadSeed(){
+ let j=await fetch('data.json').then(r=>r.json());
+ let local=localStorage.getItem('BMT_MOBILE_DB_V1');
+ DATA=local?JSON.parse(local):j.records; buildWard(); draw(DATA)
+}
+function startGPS(){
+ if(!navigator.geolocation)return alert('Thiết bị không hỗ trợ GPS');
+ if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;$('gpsState').textContent='GPS: tắt';return}
+ watchId=navigator.geolocation.watchPosition(p=>{
+   me={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
+   if(meMarker)map.removeLayer(meMarker);
+   meMarker=L.circleMarker([me.lat,me.lng],{radius:8,weight:3,fillOpacity:1}).addTo(map).bindPopup(`Bạn đang ở đây<br>Độ chính xác ~${Math.round(me.acc)} m`);
+   $('gpsState').textContent='GPS: ±'+Math.round(me.acc)+'m'; apply()
+ },e=>{$('gpsState').textContent='GPS lỗi';alert(e.message)},{enableHighAccuracy:true,maximumAge:3000,timeout:15000})
+}
+$('gps').onclick=startGPS;$('find').onclick=apply;$('q').addEventListener('keydown',e=>{if(e.key==='Enter')apply()});
+$('filters').onclick=()=>{$('panel').style.display=$('panel').style.display==='block'?'none':'block'};
+$('ward').onchange=()=>{cascade();apply()};$('road').onchange=apply;$('ham').onchange=apply;
+$('reset').onclick=()=>{$('q').value='';$('ward').value='';cascade();apply()};
+$('showUpdate').onclick=()=>{$('updateBox').style.display=$('updateBox').style.display==='block'?'none':'block'};
+$('applyUpdate').onclick=()=>{
+ let f=$('file').files[0];if(!f)return alert('Chọn file JSON update');
+ let rd=new FileReader;rd.onload=()=>{try{
+   let j=JSON.parse(rd.result), inc=Array.isArray(j)?j:(j.records||[]);
+   const M=new Map(DATA.map(r=>[String(r.id),r]));let n=0,u=0;
+   inc.forEach(r=>{let id=String(r.id||'');if(!id)return;if(M.has(id)){M.set(id,{...M.get(id),...r});u++}else{M.set(id,r);n++}});
+   DATA=[...M.values()];localStorage.setItem('BMT_MOBILE_DB_V1',JSON.stringify(DATA));buildWard();apply();
+   $('updateStat').textContent=`Update xong: +${n} mới, ${u} ghi đè/cập nhật, tổng ${DATA.length}.`;
+ }catch(e){alert('File update lỗi: '+e.message)}};rd.readAsText(f,'utf-8')
+};
+loadSeed();
+</script></body></html>
